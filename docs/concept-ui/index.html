@@ -1,0 +1,1679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ImArnn Photoboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #efebe1;--panel: #fbf9f4;--panel-2: #f2ede0;--border: #d9d0bb;
+            --ink: #b9791c;--ink-dim: #8f5c12;--link: #2f7f7f;--text: #2b2620;
+            --muted: #857d6c;--danger: #b23a4e;--mono: 'IBM Plex Mono', ui-monospace, monospace;
+            --sans: 'IBM Plex Sans', system-ui, sans-serif;
+        }
+        * { box-sizing: border-box; }
+        html,body {
+            margin: 0;padding: 0;background: var(--bg);color: var(--text);font-family: var(--sans);
+        }
+        body { overflow: hidden; height: 100vh; }
+
+        /* ---------- Toolbar ---------- */
+        #toolbar {
+            position: fixed;top: 0;left: 0;right: 0;z-index: 500;display: flex;
+            align-items: center;gap: 10px;padding: 10px 16px;background: rgba(251, 249, 244, 0.86);
+            backdrop-filter: blur(10px) saturate(1.1);border-bottom: 1px solid var(--border);
+            font-family: var(--mono);
+        }
+        #toolbar .brand {
+            font-weight: 700;letter-spacing: .14em;font-size: 13px;color: var(--ink);
+            padding-right: 12px;border-right: 1px solid var(--border);margin-right: 4px;
+            user-select: none;
+        }
+        #toolbar .brand small {
+            display: block;font-weight: 400;letter-spacing: .08em;color: var(--muted);
+            font-size: 9px;margin-top: 2px;
+        }
+        .tbtn {
+            appearance: none;border: 1px solid var(--border);background: var(--panel);
+            color: var(--text);font-family: var(--mono);font-size: 11.5px;letter-spacing: .04em;
+            text-transform: uppercase;padding: 8px 12px;border-radius: 3px;
+            cursor: pointer;transition: background .12s, border-color .12s, transform .05s;
+        }
+        .tbtn:hover {
+            background: var(--panel-2);border-color: var(--ink-dim);
+        }
+        .tbtn:active {
+            transform: translateY(1px);
+        }
+        .tbtn.primary {
+            border-color: var(--ink);color: var(--ink-dim);
+        }
+        .tbtn.primary:hover {
+            background: rgba(185, 121, 28, 0.1);
+        }
+        #search-wrap {
+            position: relative;font-family: var(--mono);
+        }
+        #card-search {
+            background: var(--panel);border: 1px solid var(--border);color: var(--text);
+            font-family: var(--mono);font-size: 11.5px;padding: 8px 10px;
+            border-radius: 3px;outline: none;width: 180px;
+        }
+        #card-search::placeholder {
+            color: var(--muted);
+        }
+        #card-search:focus {
+            border-color: var(--ink);
+        }
+        #search-results {
+            position: absolute;top: calc(100% + 6px);left: 0;min-width: 180px;max-height: 240px;
+            overflow-y: auto;background: var(--panel);border: 1px solid var(--border);
+            border-radius: 4px;box-shadow: 0 10px 26px rgba(43, 38, 32, 0.2);display: none;
+            z-index: 550;
+        }
+        .search-item {
+            padding: 7px 12px;cursor: pointer;font-family: var(--mono);
+        }
+        .search-item-main {
+            font-size: 12px;color: var(--text);white-space: nowrap;overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .search-item-sub {
+            font-size: 9.5px;color: var(--muted);margin-top: 2px;text-transform: uppercase;
+            letter-spacing: .04em;white-space: nowrap;overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .search-item:hover {
+            background: rgba(185, 121, 28, 0.12);
+        }
+        .search-item:hover .search-item-main {
+            color: var(--ink-dim);
+        }
+        .search-empty {
+            padding: 8px 12px;font-size: 12px;color: var(--muted);font-family: var(--mono);
+        }
+        #filestatus {
+            font-family: var(--mono);font-size: 11px;color: var(--muted);white-space: nowrap;
+            overflow: hidden;text-overflow: ellipsis;max-width: 280px;
+            margin-left: auto;
+        }
+        #filestatus .dot {
+            color: var(--ink);
+        }
+        #pinned-cards {
+            display: flex;align-items: center;gap: 6px;overflow-x: auto;
+            max-width: 280px;scrollbar-width: none;
+        }
+        #pinned-cards::-webkit-scrollbar {
+            display: none;
+        }
+        .pin-chip {
+            display: inline-flex;align-items: center;gap: 5px;flex: 0 0 auto;
+            background: var(--panel);border: 1px solid var(--border);
+            color: var(--text);font-family: var(--mono);font-size: 10.5px;
+            letter-spacing: .03em;padding: 6px 10px;border-radius: 3px;
+            cursor: pointer;white-space: nowrap;
+            transition: background .12s, border-color .12s, color .12s;
+        }
+        .pin-chip:hover {
+            background: rgba(185, 121, 28, 0.12);border-color: var(--ink);
+            color: var(--ink-dim);
+        }
+
+        /* ---------- Stack / Cards ---------- */
+        #stack {
+            position: fixed;inset: 0;overflow-y: scroll;scroll-snap-type: y mandatory;
+            scrollbar-width: none;
+        }
+        #stack::-webkit-scrollbar {
+            display: none;
+        }
+        .card {
+            position: relative;width: 100vw;height: 100vh;scroll-snap-align: start;
+            scroll-snap-stop: always;background-color: #e4ddca;background-size: cover;
+            background-position: center;background-repeat: no-repeat;overflow: hidden;
+            border-bottom: 1px dashed rgba(43, 38, 32, 0.16);
+        }
+        .card:last-child {
+            border-bottom: none;
+        }
+        .card:not(:last-child)::after {
+            content: "";position: absolute;left: 0;right: 0;bottom: -1px;height: 10px;
+            background-image: radial-gradient(circle, rgba(239, 235, 225, 0.95) 3px, transparent 3.2px);
+            background-size: 22px 10px;background-position: 8px 0;pointer-events: none;
+            opacity: .65;
+        }
+        .card-tab {
+            position: absolute;top: 0;left: 22px;z-index: 20;font-family: var(--mono);
+            font-size: 12px;letter-spacing: .08em;text-transform: uppercase;
+            color: var(--ink-dim);background: var(--panel);padding: 9px 16px 7px 14px;
+            border: 1px solid var(--border);border-top: none;
+            clip-path: polygon(0 0, 100% 0, 92% 100%, 8% 100%);cursor: text;
+            outline: none;min-width: 60px;text-align: center;
+            box-shadow: 0 4px 10px rgba(43, 38, 32, 0.16);
+        }
+        .card-tab:focus {
+            color: var(--text);
+        }
+        .card-index {
+            position: absolute;top: 14px;right: 22px;z-index: 20;font-family: var(--mono);
+            font-size: 10.5px;color: var(--muted);background: rgba(251, 249, 244, 0.75);
+            padding: 4px 8px;border-radius: 2px;letter-spacing: .06em;
+            border: 1px solid var(--border);
+        }
+        .card-lock-badge {
+            position: absolute;top: 44px;right: 22px;z-index: 20;font-family: var(--mono);
+            font-size: 10px;color: var(--ink-dim);background: rgba(251, 249, 244, 0.9);
+            padding: 4px 8px;border-radius: 2px;letter-spacing: .06em;
+            text-transform: uppercase;border: 1px solid var(--border);
+        }
+        /* bottom-right control cluster (per-card content controls) */
+        .card-controls {
+            position: absolute;bottom: 18px;right: 18px;z-index: 30;display: flex;
+            flex-direction: column;align-items: flex-end;gap: 6px;
+        }
+        /* bottom-left control cluster (stack-level: slug / add / delete card) */
+        .card-controls-left {
+            position: absolute;bottom: 18px;left: 18px;z-index: 30;display: flex;
+            flex-direction: column;align-items: flex-start;gap: 6px;
+        }
+        .cbtn {
+            appearance: none;border: 1px solid var(--border);background: rgba(251, 249, 244, 0.9);
+            backdrop-filter: blur(6px);color: var(--text);font-family: var(--mono);
+            font-size: 10.5px;letter-spacing: .05em;text-transform: uppercase;
+            padding: 8px 12px;border-radius: 3px;cursor: pointer;white-space: nowrap;
+            transition: background .12s, border-color .12s, color .12s;
+        }
+        .cbtn:hover {
+            background: rgba(185, 121, 28, 0.12);border-color: var(--ink);
+            color: var(--ink-dim);
+        }
+        .cbtn.danger:hover {
+            background: rgba(178, 58, 78, 0.1);border-color: var(--danger);
+            color: var(--danger);
+        }
+        .cbtn.disabled {
+            opacity: .4;cursor: not-allowed;
+        }
+        .cbtn.disabled:hover {
+            background: rgba(251, 249, 244, 0.9);border-color: var(--border);
+            color: var(--text);
+        }
+        .cbtn.disabled.danger:hover {
+            color: var(--text);border-color: var(--border);
+            background: rgba(251, 249, 244, 0.9);
+        }
+        .cbtn.active {
+            background: rgba(185, 121, 28, 0.18);border-color: var(--ink);
+            color: var(--ink-dim);
+        }
+
+        /* ---------- Rim nav: Back / Home / Forward ---------- */
+        #rim-nav {
+            position: fixed;left: 16px;top: 50%;transform: translateY(-50%);
+            z-index: 400;display: flex;flex-direction: column;align-items: center;
+            gap: 10px;
+        }
+        .rim-btn {
+            width: 46px;height: 46px;border-radius: 50%;background: rgba(251, 249, 244, 0.9);
+            border: 1px solid var(--border);display: flex;align-items: center;
+            justify-content: center;font-size: 19px;cursor: pointer;
+            box-shadow: 0 4px 14px rgba(43, 38, 32, 0.18);
+            transition: background .12s, border-color .12s, transform .12s, opacity .12s;
+        }
+        .rim-btn:hover {
+            background: rgba(185, 121, 28, 0.14);border-color: var(--ink);
+            transform: scale(1.06);
+        }
+        .rim-btn.disabled {
+            opacity: .35;cursor: not-allowed;
+        }
+        .rim-btn.disabled:hover {
+            background: rgba(251, 249, 244, 0.9);border-color: var(--border);
+            transform: none;
+        }
+        .rim-btn.nav-arrow {
+            font-size: 17px;
+        }
+        .placeholder-hint {
+            position: absolute;inset: 0;display: flex;align-items: center;
+            justify-content: center;font-family: var(--mono);color: rgba(43, 38, 32, 0.28);
+            font-size: 13px;letter-spacing: .08em;pointer-events: none;
+            text-transform: uppercase;
+        }
+
+        /* ---------- Placed elements ---------- */
+        .placed-el {
+            position: absolute;transform: translate(-50%, -50%);z-index: 15;
+            display: inline-flex;align-items: center;gap: 6px;
+        }
+        .placed-el .handle {
+            cursor: grab;font-size: 12px;color: rgba(43, 38, 32, 0.45);
+            opacity: 0;transition: opacity .12s;padding: 2px 3px;
+            user-select: none;
+        }
+        .placed-el:hover .handle {
+            opacity: 1;
+        }
+        .placed-el .handle:active {
+            cursor: grabbing;
+        }
+        .placed-el .del {
+            position: absolute;top: -9px;right: -9px;width: 16px;height: 16px;
+            border-radius: 50%;background: var(--danger);color: #fff;
+            font-size: 10px;line-height: 16px;text-align: center;cursor: pointer;
+            opacity: 0;transition: opacity .12s;font-family: var(--mono);
+        }
+        .placed-el:hover .del {
+            opacity: 1;
+        }
+        .placed-el .resize-handle {
+            position: absolute;bottom: -9px;right: -9px;width: 16px;height: 16px;
+            border-radius: 50%;background: var(--panel);border: 1px solid var(--border);
+            color: var(--ink-dim);font-size: 10px;line-height: 14px;
+            text-align: center;cursor: nwse-resize;opacity: 0;
+            transition: opacity .12s, background .12s;
+            user-select: none;
+        }
+        .placed-el:hover .resize-handle {
+            opacity: 1;
+        }
+        .placed-el .resize-handle:hover {
+            background: rgba(185, 121, 28, 0.18);
+        }
+        .card.locked .placed-el .handle,
+        .card.locked .placed-el .resize-handle,
+        .card.locked .placed-el .del {
+            cursor: not-allowed;
+        }
+        .el-text {
+            font-family: var(--sans);color: var(--text);background: #fff;
+            outline: none;padding: 5px 9px;min-width: 14px;border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(43, 38, 32, 0.2);
+        }
+        .el-text:focus {
+            background: #fff;box-shadow: 0 0 0 1px var(--ink);
+        }
+        .el-link {
+            font-family: var(--mono);letter-spacing: .04em;text-transform: uppercase;
+            padding: 8px 14px;border-radius: 10px;cursor: pointer;
+            border: 1px solid transparent;display: inline-flex;align-items: center;
+            gap: 6px;white-space: nowrap;box-shadow: 0 2px 8px rgba(43, 38, 32, 0.18);
+        }
+        .el-link.page {
+            background: var(--link);border-color: var(--link);color: #fff;
+        }
+        .el-link.page:hover {
+            background: #255f5f;border-color: #255f5f;
+        }
+        .el-link.web {
+            background: var(--ink);border-color: var(--ink);color: #fff;
+        }
+        .el-link.web:hover {
+            background: var(--ink-dim);border-color: var(--ink-dim);
+        }
+        .el-link .label {
+            outline: none;border-radius: 2px;
+        }
+        .el-link .label:focus {
+            box-shadow: 0 0 0 1px #fff;background: rgba(255, 255, 255, 0.22);
+        }
+        .el-link .icon {
+            user-select: none;
+        }
+
+        /* ---------- Placement mode ---------- */
+        .card.placing {
+            cursor: crosshair;
+        }
+        #place-banner {
+            position: fixed;top: 64px;left: 50%;transform: translateX(-50%);
+            z-index: 600;background: var(--panel);border: 1px solid var(--ink);
+            color: var(--ink-dim);font-family: var(--mono);font-size: 12px;
+            letter-spacing: .04em;text-transform: uppercase;padding: 10px 16px;
+            border-radius: 4px;display: none;align-items: center;gap: 14px;
+            box-shadow: 0 8px 24px rgba(43, 38, 32, 0.22);
+        }
+        #place-banner button {
+            appearance: none;background: none;border: 1px solid var(--border);
+            color: var(--muted);font-family: var(--mono);font-size: 10.5px;
+            padding: 4px 9px;border-radius: 3px;cursor: pointer;
+        }
+        #place-banner button:hover {
+            color: var(--text);border-color: var(--muted);
+        }
+        #restore-banner {
+            position: fixed;top: 64px;left: 50%;transform: translateX(-50%);
+            z-index: 600;background: var(--panel);border: 1px solid var(--link);
+            color: var(--link);font-family: var(--mono);font-size: 12px;
+            letter-spacing: .02em;padding: 10px 16px;border-radius: 4px;
+            display: none;align-items: center;gap: 14px;
+            box-shadow: 0 8px 24px rgba(43, 38, 32, 0.22);
+            max-width: min(480px, 88vw);
+        }
+        #restore-banner-text {
+            white-space: nowrap;overflow: hidden;text-overflow: ellipsis;
+        }
+        #restore-banner button {
+            appearance: none;background: none;border: 1px solid var(--border);
+            color: var(--muted);font-family: var(--mono);font-size: 10.5px;
+            padding: 4px 9px;border-radius: 3px;cursor: pointer;
+            flex: 0 0 auto;
+        }
+        #restore-banner button:hover {
+            color: var(--text);border-color: var(--muted);
+        }
+        #restore-banner button.go {
+            border-color: var(--link);color: var(--link);
+        }
+        #restore-banner button.go:hover {
+            background: rgba(47, 127, 127, 0.1);
+        }
+
+        /* ---------- Modal ---------- */
+        #modal-overlay {
+            position: fixed;inset: 0;background: rgba(43, 38, 32, 0.35);
+            z-index: 700;display: none;align-items: center;justify-content: center;
+            overflow-y: auto;padding: 32px 16px;
+        }
+        .modal {
+            background: var(--panel);border: 1px solid var(--border);
+            border-radius: 6px;width: 360px;max-width: 92vw;max-height: calc(100vh - 64px);
+            padding: 20px;box-shadow: 0 20px 60px rgba(43, 38, 32, 0.28);
+            display: flex;flex-direction: column;
+        }
+        .modal h3 {
+            margin: 0 0 14px;font-family: var(--mono);font-size: 12px;
+            letter-spacing: .08em;text-transform: uppercase;
+            color: var(--ink-dim);flex: 0 0 auto;
+        }
+        .modal label {
+            display: block;font-family: var(--mono);font-size: 10.5px;
+            color: var(--muted);margin-bottom: 6px;letter-spacing: .04em;
+            text-transform: uppercase;flex: 0 0 auto;
+        }
+        .modal input[type=text],
+        .modal select {
+            width: 100%;background: var(--bg);border: 1px solid var(--border);
+            color: var(--text);flex: 0 0 auto;font-family: var(--sans);
+            font-size: 13px;padding: 9px 10px;border-radius: 3px;margin-bottom: 14px;
+            outline: none;
+        }
+        .modal input[type=text]:focus,
+        .modal select:focus { border-color: var(--ink); }
+        .modal .row {
+            display: flex;justify-content: flex-end;gap: 8px;flex: 0 0 auto;
+        }
+        .modal .row button {
+            font-family: var(--mono);font-size: 11px;letter-spacing: .04em;
+            text-transform: uppercase;padding: 8px 14px;border-radius: 3px;
+            cursor: pointer;border: 1px solid var(--border);background: var(--panel-2);
+            color: var(--text);
+        }
+        .modal .row button.go {
+            border-color: var(--ink);color: var(--ink-dim);
+        }
+        .modal .row button.go:hover {
+            background: rgba(185, 121, 28, 0.12);
+        }
+        .modal .row button.danger {
+            border-color: var(--danger);color: var(--danger);
+        }
+        .modal .row button.danger:hover {
+            background: rgba(178, 58, 78, 0.1);
+        }
+        .modal .empty-note {
+            font-size: 12.5px;color: var(--muted);line-height: 1.5;margin-bottom: 16px;
+            flex: 0 0 auto;
+        }
+        .bg-file-row {
+            margin: -4px 0 16px;
+        }
+        .bg-file-row #modal-file-trigger {
+            font-family: var(--mono);font-size: 11px;color: var(--link);
+            text-decoration: underline;cursor: pointer;letter-spacing: .02em;
+        }
+        .bg-file-row #modal-file-trigger:hover {
+            color: var(--ink-dim);
+        }
+        .slug-list {
+            flex: 1 1 auto;min-height: 60px;max-height: min(320px, 45vh);overflow-y: auto;
+            border: 1px solid var(--border);border-radius: 4px;margin-bottom: 14px;
+        }
+        .slug-item {
+            display: block;width: 100%;text-align: left;background: none;
+            border: none;border-bottom: 1px solid var(--border);padding: 9px 12px;
+            font-family: var(--sans);font-size: 13px;color: var(--text);
+            cursor: pointer;
+        }
+        .slug-item:last-child {
+            border-bottom: none;
+        }
+        .slug-item:hover {
+            background: rgba(185, 121, 28, 0.1);color: var(--ink-dim);
+        }
+        .slug-list-empty {
+            padding: 12px;font-size: 12.5px;color: var(--muted);
+            font-family: var(--mono);
+        }
+        #toast {
+            position: fixed;bottom: 20px;left: 50%;transform: translateX(-50%) translateY(0);
+            z-index: 800;background: var(--panel);border: 1px solid var(--border);
+            color: var(--text);font-family: var(--mono);font-size: 11.5px;
+            padding: 10px 16px;border-radius: 4px;opacity: 0;pointer-events: none;
+            transition: opacity .2s, transform .2s;
+            box-shadow: 0 8px 20px rgba(43, 38, 32, 0.18);
+        }
+        #toast.show {
+            opacity: 1;transform: translateX(-50%) translateY(-6px);
+        }
+        #toast.error {
+            border-color: var(--danger);
+            color: var(--danger);
+        }
+    </style>
+</head>
+
+<body>
+    <div id="toolbar">
+        <div class="brand">ImArnn<small>Photoboard</small></div>
+        <button class="tbtn" id="btn-new">Create New</button>
+        <button class="tbtn primary" id="btn-save">Save</button>
+        <button class="tbtn" id="btn-saveas">Save As</button>
+        <button class="tbtn" id="btn-load">Load</button>
+        <div id="search-wrap">
+            <input type="text" id="card-search" placeholder="Search cards & text…" autocomplete="off">
+            <div id="search-results"></div>
+        </div>
+        <div id="pinned-cards"></div>
+        <div id="filestatus"><span class="dot">●</span> 
+            <span id="filestatus-text">Untitled</span></div>
+    </div>
+
+    <div id="rim-nav">
+        <div id="btn-back" class="rim-btn nav-arrow disabled" title="Back">←</div>
+        <div id="btn-home" class="rim-btn" title="Go to first card">🏠</div>
+        <div id="btn-forward" class="rim-btn nav-arrow disabled" title="Forward">→</div>
+    </div>
+
+    <div id="place-banner">
+        <span id="place-banner-text">Click on the card to place</span>
+        <button id="place-cancel">Esc / Cancel</button>
+    </div>
+
+    <div id="restore-banner">
+        <span id="restore-banner-text">Reopen your last file?</span>
+        <button class="go" id="restore-open">Reopen</button>
+        <button id="restore-dismiss">Dismiss</button>
+    </div>
+
+    <div id="stack"></div>
+    <div id="modal-overlay">
+        <div class="modal" id="modal"></div>
+    </div>
+
+    <div id="toast"></div>
+    <input type="file" id="fallback-load-input" accept="application/json" style="display:none">
+
+    <script>
+        (function () {
+            "use strict";
+
+            // ---------------- State ----------------
+            let state = { divs: [] };
+            let fileHandle = null;
+            let fileName = null;
+
+            function uid() { 
+                return 'id-' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36); 
+            }
+
+            // ---------------- IndexedDB: remember the last opened file handle ----------------
+            // FileSystemFileHandle objects are structured-cloneable, so they can be stored
+            // in IndexedDB directly (supported in Chromium-based browsers). This lets the
+            // app offer to reopen the same file next time, without needing localStorage
+            // (which can't hold file handles) or re-asking the user to browse for it.
+            const IDB_NAME = 'indexbox-db';
+            const IDB_STORE = 'handles';
+            const IDB_LAST_FILE_KEY = 'lastFileHandle';
+
+            function idbOpen() {
+                return new Promise((resolve, reject) => {
+                    if (!window.indexedDB) { 
+                        reject(new Error('IndexedDB not available')); 
+                        return; 
+                    }
+                    const req = indexedDB.open(IDB_NAME, 1);
+                    req.onupgradeneeded = () => {
+                        if (!req.result.objectStoreNames.contains(IDB_STORE)) 
+                            req.result.createObjectStore(IDB_STORE);
+                    };
+                    req.onsuccess = () => resolve(req.result);
+                    req.onerror = () => reject(req.error);
+                });
+            }
+
+            async function idbSet(key, value) {
+                const db = await idbOpen();
+                return new Promise((resolve, reject) => {
+                    const tx = db.transaction(IDB_STORE, 'readwrite');
+                    tx.objectStore(IDB_STORE).put(value, key);
+                    tx.oncomplete = () => resolve();
+                    tx.onerror = () => reject(tx.error);
+                });
+            }
+
+            async function idbGet(key) {
+                const db = await idbOpen();
+                return new Promise((resolve, reject) => {
+                    const tx = db.transaction(IDB_STORE, 'readonly');
+                    const req = tx.objectStore(IDB_STORE).get(key);
+                    req.onsuccess = () => resolve(req.result);
+                    req.onerror = () => reject(req.error);
+                });
+            }
+
+            async function idbDelete(key) {
+                const db = await idbOpen();
+                return new Promise((resolve, reject) => {
+                    const tx = db.transaction(IDB_STORE, 'readwrite');
+                    tx.objectStore(IDB_STORE).delete(key);
+                    tx.oncomplete = () => resolve();
+                    tx.onerror = () => reject(tx.error);
+                });
+            }
+
+            function rememberFileHandle(handle) {
+                idbSet(IDB_LAST_FILE_KEY, handle).catch(err => 
+                    console.error('Could not remember file handle:', err)
+                );
+            }
+
+            const DEFAULT_FONT_SIZE = { text: 20, pageLink: 12, webLink: 12 };
+            const MIN_FONT_SIZE = 8;
+            const MAX_FONT_SIZE = 140;
+
+            function newCard(slug) {
+                return { 
+                    id: uid(), slug: slug || 'card', background: '', locked: false, 
+                    pinned: false, elements: [] 
+                };
+            }
+
+            function defaultState() {
+                return { divs: [newCard('home')] };
+            }
+            state = defaultState();
+            const stackEl = document.getElementById('stack');
+
+            function goToCard(cardId) {
+                const targetEl = stackEl.querySelector(`.card[data-id="${cardId}"]`);
+                if (targetEl) targetEl.scrollIntoView({ behavior: 'auto' });
+            }
+
+            // ---------------- Page-link navigation history (Back / Forward) ----------------
+            let navHistory = [];
+            let navIndex = -1;
+
+            function recordPageLinkNav(fromCardId, toCardId) {
+                if (navHistory.length === 0) {
+                    navHistory.push(fromCardId);
+                    navIndex = 0;
+                }
+                // clicking a new link while parked mid-history drops the old "future" branch
+                navHistory = navHistory.slice(0, navIndex + 1);
+                if (navHistory[navIndex] !== toCardId) {
+                    navHistory.push(toCardId);
+                    navIndex = navHistory.length - 1;
+                }
+                updateNavButtons();
+            }
+
+            function goBack() {
+                if (navIndex <= 0) { 
+                    toast('No earlier page in history.', true); 
+                    return; 
+                }
+                navIndex--;
+                const id = navHistory[navIndex];
+
+                if (!state.divs.some(d => d.id === id)) { 
+                    toast('That card no longer exists.', true); 
+                    return; 
+                }
+                goToCard(id);
+                updateNavButtons();
+            }
+
+            function goForward() {
+                if (navIndex < 0 || navIndex >= navHistory.length - 1) { 
+                    toast('No later page in history.', true); 
+                    return; 
+                }
+                navIndex++;
+                const id = navHistory[navIndex];
+
+                if (!state.divs.some(d => d.id === id)) { 
+                    toast('That card no longer exists.', true); 
+                    return; 
+                }
+                goToCard(id);
+                updateNavButtons();
+            }
+
+            function updateNavButtons() {
+                const backBtn = document.getElementById('btn-back');
+                const forwardBtn = document.getElementById('btn-forward');
+                backBtn.classList.toggle('disabled', navIndex <= 0);
+                forwardBtn.classList.toggle('disabled', navIndex < 0 || navIndex >= navHistory.length - 1);
+            }
+
+            // ---------------- Placement mode ----------------
+            let placing = null; // { type: 'text'|'pageLink'|'webLink', cardId, targetSlug?, url? }
+            const placeBanner = document.getElementById('place-banner');
+            const placeBannerText = document.getElementById('place-banner-text');
+            document.getElementById('place-cancel').addEventListener('click', cancelPlacement);
+
+            function startPlacement(cardId, type, extra) {
+                placing = Object.assign({ cardId, type }, extra || {});
+                const labelMap = { 
+                    text: 'Add Text', pageLink: 'Add Page Link', webLink: 'Add Web Link' 
+                };
+                placeBannerText.textContent = labelMap[type] + ' — click on the card to place it';
+                placeBanner.style.display = 'flex';
+                document.querySelectorAll('.card').forEach(c => 
+                    c.classList.toggle('placing', c.dataset.id === cardId)
+                );
+            }
+
+            function cancelPlacement() {
+                placing = null;
+                placeBanner.style.display = 'none';
+                document.querySelectorAll('.card').forEach(c => c.classList.remove('placing'));
+            }
+
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    if (placing) cancelPlacement();
+                    closeModal();
+                    document.getElementById('search-results').style.display = 'none';
+                }
+            });
+
+            // ---------------- Toast ----------------
+            let toastTimer = null;
+
+            function toast(msg, isError) {
+                const t = document.getElementById('toast');
+                t.textContent = msg;
+                t.classList.toggle('error', !!isError);
+                t.classList.add('show');
+                clearTimeout(toastTimer);
+                toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
+            }
+
+            // ---------------- Modal ----------------
+            const modalOverlay = document.getElementById('modal-overlay');
+            const modalEl = document.getElementById('modal');
+
+            function closeModal() { 
+                modalOverlay.style.display = 'none'; modalEl.innerHTML = ''; 
+            }
+
+            function escapeHtml(s) { 
+                return String(s).replace(/[&<>"']/g, c => 
+                    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])
+                ); 
+            }
+            function escapeAttr(s) { return escapeHtml(s); }
+
+            // Generic single-field text modal. opts: { placeholder, initialValue, confirmLabel, selectAll }
+            function openTextModal(title, labelText, onConfirm, opts) {
+                opts = opts || {};
+
+                modalEl.innerHTML = `
+                <h3>${escapeHtml(title)}</h3>
+                <label>${escapeHtml(labelText)}</label>
+                <input type="text" id="modal-input" placeholder="${escapeAttr(opts.placeholder || '')}" 
+                    autofocus>
+                <div class="row">
+                    <button id="modal-cancel">Cancel</button>
+                    <button class="go" id="modal-go">${
+                        escapeHtml(opts.confirmLabel || 'Continue')}</button>
+                </div>`;
+
+                modalOverlay.style.display = 'flex';
+                const input = document.getElementById('modal-input');
+                if (opts.initialValue) input.value = opts.initialValue;
+                input.focus();
+                if (opts.selectAll) input.select();
+
+                function submit() {
+                    const val = input.value.trim();
+                    if (!val) { input.focus(); return; }
+                    closeModal();
+                    onConfirm(val);
+                }
+                document.getElementById('modal-go').addEventListener('click', submit);
+                document.getElementById('modal-cancel').addEventListener('click', closeModal);
+                input.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
+            }
+
+            // Filterable card picker, used by Add Page Link.
+            function openSlugPickerModal(currentCardId, onConfirm) {
+                const others = state.divs.filter(d => d.id !== currentCardId);
+
+                if (others.length === 0) {
+                    modalEl.innerHTML = `
+                    <h3>Add Page Link</h3>
+                    <div class="empty-note">There's only one card in this stack right now. 
+                        Add another card first, then you can link to it.</div>
+                    <div class="row"><button id="modal-cancel">Close</button></div>`;
+
+                    modalOverlay.style.display = 'flex';
+                    document.getElementById('modal-cancel')
+                        .addEventListener('click', closeModal);
+                    return;
+                }
+                modalEl.innerHTML = `
+                <h3>Add Page Link</h3>
+                <label>Target card</label>
+                <input type="text" id="modal-filter" placeholder="Filter by slug…" autofocus>
+                <div class="slug-list" id="modal-slug-list"></div>
+                <div class="row"><button id="modal-cancel">Cancel</button></div>`;
+
+                modalOverlay.style.display = 'flex';
+                const filterInput = document.getElementById('modal-filter');
+                const listEl = document.getElementById('modal-slug-list');
+
+                function renderList(filterText) {
+                    const f = filterText.trim().toLowerCase();
+                    const matches = others.filter(d => d.slug.toLowerCase().includes(f));
+                    listEl.innerHTML = '';
+
+                    if (matches.length === 0) {
+                        const empty = document.createElement('div');
+                        empty.className = 'slug-list-empty';
+                        empty.textContent = 'No matching cards.';
+                        listEl.appendChild(empty);
+                        return;
+                    }
+                    matches.forEach(d => {
+                        const item = document.createElement('button');
+                        item.type = 'button';
+                        item.className = 'slug-item';
+                        item.textContent = d.slug;
+                        item.addEventListener('click', () => { closeModal(); onConfirm(d.slug); });
+                        listEl.appendChild(item);
+                    });
+                }
+
+                renderList('');
+                filterInput.addEventListener('input', () => renderList(filterInput.value));
+                filterInput.addEventListener('keydown', e => {
+                    if (e.key === 'Enter') {
+                        const first = listEl.querySelector('.slug-item');
+                        if (first) first.click();
+                    }
+                });
+                filterInput.focus();
+                document.getElementById('modal-cancel').addEventListener('click', closeModal);
+            }
+
+            // Custom confirm modal — window.confirm() can be silently blocked in
+            // sandboxed preview frames, so all "are you sure" prompts use this instead.
+            function openConfirmModal(title, message, confirmLabel, onConfirm, isDanger) {
+                modalEl.innerHTML = `
+                <h3>${escapeHtml(title)}</h3>
+                <div class="empty-note">${escapeHtml(message)}</div>
+                <div class="row">
+                    <button id="modal-cancel">Cancel</button>
+                    <button class="${isDanger ? 'danger' : 'go'}" id="modal-go"
+                        >${escapeHtml(confirmLabel)}</button>
+                </div>`;
+
+                modalOverlay.style.display = 'flex';
+                document.getElementById('modal-go').addEventListener('click', () => { 
+                    closeModal(); 
+                    onConfirm(); 
+                });
+                document.getElementById('modal-cancel').addEventListener('click', closeModal);
+            }
+
+            // ---------------- Rendering ----------------
+            function renderAll() {
+                const prevScroll = stackEl.scrollTop;
+                stackEl.innerHTML = '';
+                state.divs.forEach((card, idx) => stackEl.appendChild(renderCard(card, idx)));
+                stackEl.scrollTop = prevScroll;
+                renderPinnedBar();
+            }
+
+            function renderPinnedBar() {
+                const bar = document.getElementById('pinned-cards');
+                bar.innerHTML = '';
+                state.divs.filter(d => d.pinned).forEach(d => {
+                    const chip = document.createElement('div');
+                    chip.className = 'pin-chip';
+                    chip.title = `Go to "${d.slug}"`;
+                    chip.innerHTML = `<span>📌</span><span>${escapeHtml(d.slug)}</span>`;
+                    chip.addEventListener('click', () => goToCard(d.id));
+                    bar.appendChild(chip);
+                });
+            }
+
+            function applyBackground(cardEl, card, url, opts) {
+                opts = opts || {};
+                // Apply immediately — don't gate this on a preload check. A standalone
+                // Image() probe can fail (referrer/hotlink checks, CORS quirks) even when
+                // the exact same URL renders perfectly fine as a CSS background-image, so
+                // blocking on it caused valid backgrounds to silently get rejected.
+                card.background = url;
+                cardEl.style.backgroundImage = `url("${url.replace(/"/g, '\\"')}")`;
+                const hint = cardEl.querySelector('.placeholder-hint');
+                if (hint) hint.remove();
+
+                if (opts.silent) return; // caller (e.g. local-file upload) shows its own toast
+
+                // Best-effort confirmation only — never blocks or reverts the change above.
+                // data: URLs (local file uploads) always resolve, so this only meaningfully
+                // warns for external links that may be hotlink/referrer-blocked.
+                const probe = new Image();
+                probe.onload = () => toast('Background set.');
+                probe.onerror = () => toast(
+                    "Background applied — if it looks blank, that link may be blocked by "+
+                    "the site (hotlink protection) or isn't a direct image link. "+
+                    "Try 'choose an image file' instead.", 
+                    true
+                );
+                probe.src = url;
+            }
+
+            function openBackgroundModal(cardEl, card) {
+                modalEl.innerHTML = `
+                <h3>Set Background</h3>
+                <label>Image URL</label>
+                <input type="text" id="modal-input" placeholder="https://…" autofocus>
+                <div class="bg-file-row">
+                    <span id="modal-file-trigger">or choose an image file from this device…</span>
+                    <input type="file" id="modal-file-input" accept="image/*" style="display:none">
+                </div>
+                <div class="row">
+                    <button id="modal-cancel">Cancel</button>
+                    <button class="go" id="modal-go">Continue</button>
+                </div>`;
+                modalOverlay.style.display = 'flex';
+                const input = document.getElementById('modal-input');
+                input.focus();
+
+                function submit() {
+                    const val = input.value.trim();
+                    if (!val) { input.focus(); return; }
+                    closeModal();
+                    applyBackground(cardEl, card, val);
+                }
+                document.getElementById('modal-go').addEventListener('click', submit);
+                document.getElementById('modal-cancel').addEventListener('click', closeModal);
+                input.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
+
+                const fileInput = document.getElementById('modal-file-input');
+                document.getElementById('modal-file-trigger').addEventListener(
+                    'click', () => fileInput.click());
+                fileInput.addEventListener('change', (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+
+                    reader.onload = () => {
+                        closeModal();
+                        applyBackground(cardEl, card, reader.result, { silent: true });
+                        toast('Background set from local file.');
+                    };
+                    reader.onerror = () => toast('Could not read that image file.', true);
+                    reader.readAsDataURL(file);
+                });
+            }
+
+            function renderCard(card, idx) {
+                const el = document.createElement('div');
+                el.className = 'card';
+                el.classList.toggle('locked', !!card.locked);
+                el.dataset.id = card.id;
+                if (card.background) el.style.backgroundImage = 
+                    `url("${card.background.replace(/"/g, '\\"')}")`;
+
+                // tab (slug)
+                const tab = document.createElement('div');
+                tab.className = 'card-tab';
+                tab.contentEditable = card.locked ? 'false' : 'true';
+                tab.style.cursor = card.locked ? 'default' : 'text';
+                tab.spellcheck = false;
+                tab.textContent = card.slug;
+
+                tab.addEventListener('blur', () => {
+                    if (card.locked) return;
+                    const val = tab.textContent.trim().replace(/\s+/g, '-') || 'card';
+                    card.slug = val;
+                    tab.textContent = val;
+                });
+                tab.addEventListener('keydown', e => { 
+                    if (e.key === 'Enter') { e.preventDefault(); tab.blur(); } 
+                });
+                el.appendChild(tab);
+
+                // index badge
+                const badge = document.createElement('div');
+                badge.className = 'card-index';
+                badge.textContent = `${idx + 1} / ${state.divs.length}`;
+                el.appendChild(badge);
+
+                if (card.locked) {
+                    const lockBadge = document.createElement('div');
+                    lockBadge.className = 'card-lock-badge';
+                    lockBadge.textContent = '🔒 Locked';
+                    el.appendChild(lockBadge);
+                }
+                // empty hint
+                if (!card.background && card.elements.length === 0) {
+                    const hint = document.createElement('div');
+                    hint.className = 'placeholder-hint';
+                    hint.textContent = 'empty card — set a background to begin';
+                    el.appendChild(hint);
+                }
+                // placed elements
+                card.elements.forEach(item => el.appendChild(renderElement(el, card, item)));
+
+                // bottom-right: content controls
+                const controls = document.createElement('div');
+                controls.className = 'card-controls';
+
+                controls.appendChild(makeCtrlBtn('Set Background', () => {
+                    openBackgroundModal(el, card);
+                }));
+                controls.appendChild(makeCtrlBtn('Add Text', () => {
+                    startPlacement(card.id, 'text');
+                }));
+                controls.appendChild(makeCtrlBtn('Add Page Link', () => {
+                    openSlugPickerModal(card.id, (targetSlug) => {
+                        startPlacement(card.id, 'pageLink', { targetSlug });
+                    });
+                }));
+                controls.appendChild(makeCtrlBtn('Add Web Link', () => {
+                    openTextModal('Add Web Link', 'Destination URL', (url) => {
+                        startPlacement(card.id, 'webLink', { url });
+                    }, { placeholder: 'https://…' });
+                }));
+                el.appendChild(controls);
+
+                // bottom-left: stack-level controls (pin / lock / slug / add / delete card)
+                const controlsLeft = document.createElement('div');
+                controlsLeft.className = 'card-controls-left';
+
+                const pinBtn = makeCtrlBtn('📌 Toggle Pinning', () => {
+                    card.pinned = !card.pinned;
+                    renderAll();
+                    toast(card.pinned ? 'Card pinned.' : 'Card unpinned.');
+                });
+                if (card.pinned) pinBtn.classList.add('active');
+                controlsLeft.appendChild(pinBtn);
+
+                controlsLeft.appendChild(makeCtrlBtn(card.locked 
+                        ? '🔓 Unlock Card' : '🔒 Lock Card', () => {
+                    card.locked = !card.locked;
+                    renderAll();
+                    toast(card.locked ? 'Card locked.' : 'Card unlocked.');
+                }));
+
+                const slugBtn = makeCtrlBtn('Change Card Slug', () => {
+                    if (card.locked) { 
+                        toast('Unlock the card to rename it.', true); 
+                        return; 
+                    }
+                    openTextModal('Change Card Slug', 'Slug', (val) => {
+                        const clean = val.trim().replace(/\s+/g, '-') || 'card';
+                        card.slug = clean;
+                        tab.textContent = clean;
+                    }, { 
+                        initialValue: card.slug, placeholder: 'card-slug', 
+                        selectAll: true, confirmLabel: 'Rename' 
+                    });
+                });
+                if (card.locked) slugBtn.classList.add('disabled');
+                controlsLeft.appendChild(slugBtn);
+
+                controlsLeft.appendChild(makeCtrlBtn('+ Add Card', () => {
+                    const n = state.divs.length + 1;
+                    state.divs.push(newCard('card-' + n));
+                    renderAll();
+                    requestAnimationFrame(() => stackEl.scrollTo({ 
+                        top: stackEl.scrollHeight, behavior: 'auto' }));
+                }));
+
+                const delBtn = makeCtrlBtn('✕ Delete Card', () => {
+                    if (card.locked) { 
+                        toast('Unlock the card to delete it.', true); 
+                        return; 
+                    }
+                    if (state.divs.length === 1) { 
+                        toast("Can't delete the only card.", true); 
+                        return; 
+                    }
+                    openConfirmModal('Delete Card', 
+                    `Delete card "${card.slug}"? This can't be undone.`, 'Delete', () => {
+                        state.divs = state.divs.filter(d => d.id !== card.id);
+                        renderAll();
+                    }, true);
+                });
+                delBtn.classList.add('danger');
+                if (card.locked) delBtn.classList.add('disabled');
+                controlsLeft.appendChild(delBtn);
+                el.appendChild(controlsLeft);
+
+                // click-to-place handler
+                el.addEventListener('click', (e) => {
+                    if (!placing || placing.cardId !== card.id) return;
+
+                    if (e.target.closest('.card-controls') || e.target.closest('.card-controls-left') 
+                            || e.target.closest('.card-tab')) 
+                        return;
+
+                    const rect = el.getBoundingClientRect();
+                    const xPct = ((e.clientX - rect.left) / rect.width) * 100;
+                    const yPct = ((e.clientY - rect.top) / rect.height) * 100;
+                    let item;
+
+                    if (placing.type === 'text') {
+                        item = { 
+                            id: uid(), type: 'text', content: 'New text', x: xPct, 
+                            y: yPct, fontSize: DEFAULT_FONT_SIZE.text 
+                        };
+                    } else if (placing.type === 'pageLink') {
+                        item = { 
+                            id: uid(), type: 'pageLink', targetSlug: placing.targetSlug, 
+                            label: placing.targetSlug, x: xPct, y: yPct, 
+                            fontSize: DEFAULT_FONT_SIZE.pageLink 
+                        };
+                    } else if (placing.type === 'webLink') {
+                        item = { 
+                            id: uid(), type: 'webLink', url: placing.url, 
+                            label: shortLabel(placing.url), x: xPct, y: yPct, 
+                            fontSize: DEFAULT_FONT_SIZE.webLink 
+                        };
+                    }
+                    card.elements.push(item);
+                    const hint = el.querySelector('.placeholder-hint');
+                    if (hint) hint.remove();
+                    const wrap = renderElement(el, card, item);
+                    el.insertBefore(wrap, controls);
+                    cancelPlacement();
+
+                    if (item.type === 'text') {
+                        const editable = wrap.querySelector('.el-text');
+                        editable.focus();
+                        placeCaretAtEnd(editable);
+                    }
+                });
+                return el;
+            }
+
+            function shortLabel(url) {
+                try { const u = new URL(url); return u.hostname.replace(/^www\./, ''); }
+                catch (e) { return 'Link'; }
+            }
+
+            function placeCaretAtEnd(el) {
+                const range = document.createRange();
+                range.selectNodeContents(el);
+                range.collapse(false);
+                const sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(range);
+            }
+
+            function makeCtrlBtn(label, onClick) {
+                const b = document.createElement('button');
+                b.className = 'cbtn';
+                b.textContent = label;
+                b.addEventListener('click', (e) => { e.stopPropagation(); onClick(); });
+                return b;
+            }
+
+            function renderElement(cardEl, card, item) {
+                const wrap = document.createElement('div');
+                wrap.className = 'placed-el';
+                wrap.style.left = item.x + '%';
+                wrap.style.top = item.y + '%';
+
+                if (typeof item.fontSize !== 'number' || !item.fontSize) {
+                    item.fontSize = DEFAULT_FONT_SIZE[item.type] || 14;
+                }
+                const handle = document.createElement('span');
+                handle.className = 'handle';
+                handle.textContent = '⠿';
+                wrap.appendChild(handle);
+                let content;
+
+                if (item.type === 'text') {
+                    content = document.createElement('div');
+                    content.className = 'el-text';
+                    content.contentEditable = card.locked ? 'false' : 'true';
+                    content.style.cursor = card.locked ? 'default' : 'text';
+                    content.spellcheck = false;
+                    content.textContent = item.content;
+                    content.addEventListener('blur', () => { 
+                        if (!card.locked) item.content = content.textContent; 
+                    });
+                    content.addEventListener('keydown', e => e.stopPropagation());
+
+                } else if (item.type === 'pageLink') {
+                    content = document.createElement('div');
+                    content.className = 'el-link page';
+                    const label = document.createElement('span');
+                    label.className = 'label';
+                    label.contentEditable = card.locked ? 'false' : 'true';
+                    label.style.cursor = card.locked ? 'inherit' : 'text';
+                    label.spellcheck = false;
+                    label.textContent = item.label || item.targetSlug;
+                    label.title = card.locked
+                        ? `Locked — click to scroll to "${item.targetSlug}"`
+                        : `Right-click to edit — click to scroll to "${item.targetSlug}"`;
+
+                    label.addEventListener('blur', () => { 
+                        if (!card.locked) item.label = label.textContent.trim() || item.targetSlug; 
+                    });
+                    label.addEventListener('keydown', e => e.stopPropagation());
+                    content.appendChild(label);
+
+                    // left click: navigation only
+                    content.addEventListener('click', () => {
+                        const target = state.divs.find(d => d.slug === item.targetSlug);
+
+                        if (!target) { 
+                            toast(`No card with slug "${item.targetSlug}"`, true); 
+                            return; 
+                        }
+                        recordPageLinkNav(card.id, target.id);
+                        goToCard(target.id);
+                    });                    
+                    // right click: edit the label text
+                    content.addEventListener('contextmenu', (e) => {
+                        e.preventDefault();
+
+                        if (card.locked) { 
+                            toast('Unlock the card to rename items.', true); 
+                            return; 
+                        }
+                        label.focus();
+                        placeCaretAtEnd(label);
+                    });
+
+                } else if (item.type === 'webLink') {
+                    content = document.createElement('div');
+                    content.className = 'el-link web';
+                    const icon = document.createElement('span');
+                    icon.className = 'icon';
+                    icon.textContent = '🔗';
+                    content.appendChild(icon);
+                    const label = document.createElement('span');
+                    label.className = 'label';
+                    label.contentEditable = card.locked ? 'false' : 'true';
+                    label.style.cursor = card.locked ? 'inherit' : 'text';
+                    label.spellcheck = false;
+                    label.textContent = item.label || item.url;
+                    label.title = card.locked
+                        ? `Locked — click to open ${item.url}`
+                        : `Right-click to edit — click to open ${item.url}`;
+
+                    label.addEventListener('blur', () => { 
+                        if (!card.locked) item.label = label.textContent.trim() || item.url; 
+                    });
+                    label.addEventListener('keydown', e => e.stopPropagation());
+                    content.appendChild(label);
+
+                    // left click: navigation only
+                    content.addEventListener('click', () => {
+                        window.open(item.url, '_blank', 'noopener');
+                    });
+                    // right click: edit the label text
+                    content.addEventListener('contextmenu', (e) => {
+                        e.preventDefault();
+
+                        if (card.locked) { 
+                            toast('Unlock the card to rename items.', true); 
+                            return; 
+                        }
+                        label.focus();
+                        placeCaretAtEnd(label);
+                    });
+                }
+                content.style.fontSize = item.fontSize + 'px';
+                wrap.appendChild(content);
+                const del = document.createElement('div');
+                del.className = 'del';
+                del.textContent = '✕';
+
+                del.addEventListener('click', (e) => {
+                    e.stopPropagation();
+
+                    if (card.locked) { 
+                        toast('Unlock the card to delete items.', true); 
+                        return; 
+                    }
+                    const typeLabel = item.type === 'text' ? 
+                        'text item' : item.type === 'pageLink' ? 
+                        'page link' : 'web link';
+
+                    openConfirmModal('Delete Item', `Delete this ${typeLabel}? This can't be undone.`, 
+                    'Delete', () => {
+                        card.elements = card.elements.filter(it => it.id !== item.id);
+                        wrap.remove();
+                    }, true);
+                });
+                wrap.appendChild(del);
+
+                // resize handle — bottom-right corner, drag to change font size
+                const resize = document.createElement('div');
+                resize.className = 'resize-handle';
+                resize.textContent = '↘';
+                resize.title = 'Drag to resize text';
+                wrap.appendChild(resize);
+
+                // drag to move
+                handle.addEventListener('mousedown', (e) => {
+                    if (card.locked) { 
+                        toast('Unlock the card to move items.', true); 
+                        return; 
+                    }
+                    e.preventDefault(); e.stopPropagation();
+                    const rect = cardEl.getBoundingClientRect();
+
+                    function onMove(ev) {
+                        let xPct = ((ev.clientX - rect.left) / rect.width) * 100;
+                        let yPct = ((ev.clientY - rect.top) / rect.height) * 100;
+                        xPct = Math.max(0, Math.min(100, xPct));
+                        yPct = Math.max(0, Math.min(100, yPct));
+                        wrap.style.left = xPct + '%';
+                        wrap.style.top = yPct + '%';
+                        item.x = xPct; item.y = yPct;
+                    }
+                    function onUp() {
+                        document.removeEventListener('mousemove', onMove);
+                        document.removeEventListener('mouseup', onUp);
+                    }
+                    document.addEventListener('mousemove', onMove);
+                    document.addEventListener('mouseup', onUp);
+                });
+
+                // drag to resize (bottom-right corner handle changes font-size)
+                resize.addEventListener('mousedown', (e) => {
+                    if (card.locked) { toast('Unlock the card to resize items.', true); return; }
+                    e.preventDefault(); e.stopPropagation();
+                    const startX = e.clientX;
+                    const startY = e.clientY;
+                    const startSize = item.fontSize;
+
+                    function onMove(ev) {
+                        // diagonal drag distance toward bottom-right grows the font; toward
+                        // top-left shrinks it, matching the direction of the handle itself.
+                        const dx = ev.clientX - startX;
+                        const dy = ev.clientY - startY;
+                        const delta = (dx + dy) / 2;
+                        let newSize = Math.round(startSize + delta * 0.35);
+                        newSize = Math.max(MIN_FONT_SIZE, Math.min(MAX_FONT_SIZE, newSize));
+                        item.fontSize = newSize;
+                        content.style.fontSize = newSize + 'px';
+                    }
+                    function onUp() {
+                        document.removeEventListener('mousemove', onMove);
+                        document.removeEventListener('mouseup', onUp);
+                    }
+                    document.addEventListener('mousemove', onMove);
+                    document.addEventListener('mouseup', onUp);
+                });
+                return wrap;
+            }
+
+            // ---------------- Toolbar: card search ----------------
+            const searchInput = document.getElementById('card-search');
+            const searchResults = document.getElementById('search-results');
+
+            function getSearchMatches(q) {
+                const results = [];
+                state.divs.forEach(d => {
+                    if (d.slug.toLowerCase().includes(q)) {
+                        results.push({ cardId: d.id, primary: d.slug, secondary: 'card slug' });
+                    }
+                    d.elements.forEach(it => {
+                        let text;
+                        if (it.type === 'text') text = it.content;
+                        else if (it.type === 'pageLink') text = it.label || it.targetSlug;
+                        else if (it.type === 'webLink') text = it.label || it.url;
+
+                        if (text && text.toLowerCase().includes(q)) {
+                            const kindLabel = it.type === 'text' ? 
+                                'text' : it.type === 'pageLink' ? 
+                                'page link' : 'web link';
+                            results.push({ 
+                                cardId: d.id, primary: text, 
+                                secondary: `${kindLabel} in "${d.slug}"` 
+                            });
+                        }
+                    });
+                });
+                return results;
+            }
+
+            function renderSearchResults() {
+                const q = searchInput.value.trim().toLowerCase();
+                searchResults.innerHTML = '';
+                if (!q) { searchResults.style.display = 'none'; return; }
+                const matches = getSearchMatches(q);
+
+                if (matches.length === 0) {
+                    const empty = document.createElement('div');
+                    empty.className = 'search-empty';
+                    empty.textContent = 'No matches';
+                    searchResults.appendChild(empty);
+                    searchResults.style.display = 'block';
+                    return;
+                }
+                matches.slice(0, 30).forEach(r => {
+                    const item = document.createElement('div');
+                    item.className = 'search-item';
+                    const main = document.createElement('div');
+                    main.className = 'search-item-main';
+                    main.textContent = r.primary;
+                    item.appendChild(main);
+                    const sub = document.createElement('div');
+                    sub.className = 'search-item-sub';
+                    sub.textContent = r.secondary;
+                    item.appendChild(sub);
+
+                    item.addEventListener('mousedown', (e) => {
+                        e.preventDefault();
+                        goToCard(r.cardId);
+                        searchInput.value = '';
+                        searchResults.style.display = 'none';
+                    });
+                    searchResults.appendChild(item);
+                });
+                searchResults.style.display = 'block';
+            }
+            searchInput.addEventListener('input', renderSearchResults);
+            searchInput.addEventListener('focus', renderSearchResults);
+
+            searchInput.addEventListener('keydown', e => {
+                if (e.key === 'Enter') {
+                    const q = searchInput.value.trim().toLowerCase();
+                    const first = getSearchMatches(q)[0];
+
+                    if (first) { 
+                        goToCard(first.cardId); 
+                        searchInput.value = ''; 
+                        searchResults.style.display = 'none'; 
+                    }
+                }
+            });
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('#search-wrap')) searchResults.style.display = 'none';
+            });
+
+            // ---------------- Toolbar actions ----------------
+            document.getElementById('btn-new').addEventListener('click', () => {
+                openConfirmModal(
+                    'Create New',
+                    'Start a new stack? Unsaved changes will be lost and the file name '+
+                        'will reset to Untitled.',
+                    'Create New',
+                    () => {
+                        state = defaultState();
+                        fileHandle = null; fileName = null;
+                        navHistory = []; navIndex = -1;
+                        updateFileStatus();
+                        renderAll();
+                        updateNavButtons();
+                        toast('New stack created.');
+                    },true
+                );
+            });
+            document.getElementById('btn-home').addEventListener('click', () => {
+                if (state.divs.length === 0) return;
+                goToCard(state.divs[0].id);
+            });
+            document.getElementById('btn-back').addEventListener('click', goBack);
+            document.getElementById('btn-forward').addEventListener('click', goForward);
+            function serialize() { return JSON.stringify(state, null, 2); }
+
+            async function saveProjectAs() {
+                const data = serialize();
+
+                if (window.showSaveFilePicker) {
+                    try {
+                        const handle = await window.showSaveFilePicker({
+                            suggestedName: fileName || 'content.json',
+                            types: [{ 
+                                description: 'JSON', 
+                                accept: { 'application/json': ['.json'] } 
+                            }]
+                        });
+                        const writable = await handle.createWritable();
+                        await writable.write(data);
+                        await writable.close();
+                        fileHandle = handle;
+                        fileName = handle.name;
+                        updateFileStatus();
+                        toast('Saved.');
+                        return;
+                    } catch (err) {
+                        if (err && err.name === 'AbortError') return;
+                        console.error(err);
+                    }
+                }
+                // fallback: trigger download, always prompting the browser's own save dialog
+                const blob = new Blob([data], { type: 'application/json' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = fileName || 'content.json';
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                toast('Downloaded content.json');
+            }
+
+            async function saveProject() {
+                const data = serialize();
+
+                if (window.showSaveFilePicker) {
+                    try {
+                        if (!fileHandle) {
+                            fileHandle = await window.showSaveFilePicker({
+                                suggestedName: 'content.json',
+                                types: [{ 
+                                    description: 'JSON', accept: { 'application/json': ['.json'] } 
+                                }]
+                            });
+                        }
+                        const writable = await fileHandle.createWritable();
+                        await writable.write(data);
+                        await writable.close();
+                        fileName = fileHandle.name;
+                        updateFileStatus();
+                        toast('Saved.');
+                        return;
+                    } catch (err) {
+                        if (err && err.name === 'AbortError') return;
+                        console.error(err);
+                    }
+                }
+                // fallback: trigger download
+                const blob = new Blob([data], { type: 'application/json' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = fileName || 'content.json';
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                toast('Downloaded content.json');
+            }
+
+            async function loadProject() {
+                if (window.showOpenFilePicker) {
+                    try {
+                        const [handle] = await window.showOpenFilePicker({
+                            types: [{ 
+                                description: 'JSON', accept: { 'application/json': ['.json'] } 
+                            }]
+                        });
+                        const file = await handle.getFile();
+                        const text = await file.text();
+                        applyLoadedJson(text);
+                        fileHandle = handle;
+                        fileName = handle.name;
+                        updateFileStatus();
+                        rememberFileHandle(handle);
+                        return;
+                    } catch (err) {
+                        if (err && err.name === 'AbortError') return;
+                        console.error(err);
+                    }
+                }
+                // fallback: hidden file input
+                document.getElementById('fallback-load-input').click();
+            }
+
+            document.getElementById('fallback-load-input')
+                    .addEventListener('change', async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const text = await file.text();
+                applyLoadedJson(text);
+                fileHandle = null;
+                fileName = file.name;
+                updateFileStatus();
+                e.target.value = '';
+            });
+
+            function applyLoadedJson(text) {
+                try {
+                    const parsed = JSON.parse(text);
+
+                    if (!parsed || !Array.isArray(parsed.divs)) 
+                        throw new Error('Invalid format');
+
+                    parsed.divs.forEach(d => {
+                        d.id = d.id || uid();
+                        d.slug = d.slug || 'card';
+                        d.background = d.background || '';
+                        d.locked = !!d.locked;
+                        d.pinned = !!d.pinned;
+                        d.elements = Array.isArray(d.elements) ? d.elements : [];
+
+                        d.elements.forEach(it => {
+                            it.id = it.id || uid();
+
+                            if (typeof it.fontSize !== 'number' || !it.fontSize) {
+                                it.fontSize = DEFAULT_FONT_SIZE[it.type] || 14;
+                            }
+                        });
+                    });
+                    state = parsed;
+                    navHistory = []; navIndex = -1;
+                    renderAll();
+                    updateNavButtons();
+                    toast('Loaded.');
+                } catch (err) {
+                    toast('Could not read this file as a valid INDEXBOX JSON project.', true);
+                    console.error(err);
+                }
+            }
+            document.getElementById('btn-save').addEventListener('click', saveProject);
+            document.getElementById('btn-saveas').addEventListener('click', saveProjectAs);
+            document.getElementById('btn-load').addEventListener('click', loadProject);
+
+            function updateFileStatus() {
+                document.getElementById('filestatus-text').textContent = fileName ? 
+                    fileName : 'Untitled';
+            }
+
+            // ---------------- Restore last file on startup ----------------
+            const restoreBanner = document.getElementById('restore-banner');
+            const restoreBannerText = document.getElementById('restore-banner-text');
+
+            document.getElementById('restore-dismiss').addEventListener('click', () => {
+                restoreBanner.style.display = 'none';
+            });
+
+            async function openRestoredHandle(handle) {
+                const file = await handle.getFile();
+                const text = await file.text();
+                applyLoadedJson(text);
+                fileHandle = handle;
+                fileName = handle.name;
+                updateFileStatus();
+            }
+
+            async function tryRestoreLastFile() {
+                // File System Access API unsupported — nothing to restore
+                if (!window.showOpenFilePicker) return; 
+
+                let handle;
+                try { handle = await idbGet(IDB_LAST_FILE_KEY); }
+                catch (err) { 
+                    console.error('Could not read remembered file handle:', err); 
+                    return; 
+                }
+                if (!handle) return;
+
+                let permission;
+                try { permission = await handle.queryPermission({ mode: 'read' }); }
+                catch (err) { console.error(err); return; }
+
+                if (permission === 'granted') {
+                    try {
+                        await openRestoredHandle(handle);
+                        toast(`Reopened "${handle.name}".`);
+                    } catch (err) {
+                        console.error('Could not reopen remembered file:', err);
+                        idbDelete(IDB_LAST_FILE_KEY).catch(() => { });
+                    }
+                    return;
+                }
+
+                // Browsers require a user gesture before re-granting file permission, so we
+                // can't silently reopen it — offer a one-click banner instead.
+                restoreBannerText.textContent = `Reopen your last file, "${handle.name}"?`;
+                restoreBanner.style.display = 'flex';
+
+                document.getElementById('restore-open').onclick = async () => {
+                    try {
+                        const granted = await handle.requestPermission({ mode: 'read' });
+
+                        if (granted !== 'granted') { 
+                            toast('Permission was not granted.', true); 
+                            restoreBanner.style.display = 'none'; 
+                            return; 
+                        }
+                        await openRestoredHandle(handle);
+                        restoreBanner.style.display = 'none';
+                        toast(`Reopened "${handle.name}".`);
+                    } catch (err) {
+                        console.error(err);
+                        toast('Could not reopen that file.', true);
+                        restoreBanner.style.display = 'none';
+                    }
+                };
+            }
+
+            // ---------------- Init ----------------
+            updateFileStatus();
+            renderAll();
+            updateNavButtons();
+            tryRestoreLastFile();
+        })();
+    </script>
+</body>
+</html>
